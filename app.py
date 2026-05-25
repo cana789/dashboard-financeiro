@@ -24,6 +24,136 @@ st.set_page_config(
 )
 
 # ─────────────────────────────────────────────
+# AUTENTICAÇÃO — LOGIN POR NIP
+# ─────────────────────────────────────────────
+
+# Cadastro de usuários: { "NIP": "senha" }
+# Neste sistema o login E a senha são o próprio NIP.
+USUARIOS = {
+    "17056004": "17056004",
+    "03105288": "03105288",
+    "13130510": "13130510",
+    "96007494": "96007494",
+}
+
+def check_login(nip: str, senha: str) -> bool:
+    nip   = nip.strip()
+    senha = senha.strip()
+    return USUARIOS.get(nip) == senha
+
+def logout():
+    st.session_state.autenticado = False
+    st.session_state.usuario_nip = ""
+    st.rerun()
+
+# Inicializa estado de autenticação
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+if "usuario_nip" not in st.session_state:
+    st.session_state.usuario_nip = ""
+if "login_erro" not in st.session_state:
+    st.session_state.login_erro = False
+
+# Se não autenticado, exibe tela de login e para aqui
+if not st.session_state.autenticado:
+    # CSS específico da tela de login
+    st.markdown("""
+    <style>
+    [data-testid="stAppViewContainer"] > .main { background: #0a2342; }
+    [data-testid="stHeader"] { background: transparent; }
+    [data-testid="stToolbar"] { display: none; }
+    section[data-testid="stSidebar"] { display: none; }
+
+    .login-wrapper {
+        display: flex; flex-direction: column; align-items: center;
+        justify-content: center; min-height: 80vh;
+    }
+    .login-card {
+        background: white; border-radius: 16px;
+        padding: 2.5rem 2rem; width: 100%; max-width: 380px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        text-align: center;
+    }
+    .login-anchor { color: #0a2342; font-size: 2rem; margin-bottom: 0.25rem; }
+    .login-title  { font-size: 1.1rem; font-weight: 700; color: #0a2342; margin-bottom: 0.15rem; }
+    .login-sub    { font-size: 0.78rem; color: #6b7a8d; margin-bottom: 1.5rem; }
+    .login-divider { border: none; border-top: 1px solid #e8ecf0; margin: 1rem 0; }
+    .login-erro {
+        background: #f8d7da; color: #721c24; border-radius: 8px;
+        padding: 0.5rem 0.75rem; font-size: 0.8rem;
+        margin-bottom: 0.75rem; text-align: left;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Layout centralizado via colunas
+    _, col_mid, _ = st.columns([1, 1.2, 1])
+    with col_mid:
+        st.markdown("""
+        <div style="text-align:center; padding: 2rem 0 1rem;">
+          <div style="font-size:2.5rem;">⚓</div>
+          <div style="font-size:1.05rem; font-weight:700; color:white; margin-top:0.4rem;">
+            Dashboard de Execução Financeira
+          </div>
+          <div style="font-size:0.8rem; color:rgba(255,255,255,0.65); margin-top:0.2rem;">
+            4º Batalhão de Operações Litorâneas de Fuzileiros Navais — 2026
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        with st.form("form_login", clear_on_submit=False):
+            st.markdown(
+                '<div style="font-size:0.78rem;font-weight:600;color:#6b7a8d;'
+                'text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.4rem;">'
+                'NIP (login)</div>',
+                unsafe_allow_html=True,
+            )
+            nip_input = st.text_input(
+                "NIP", label_visibility="collapsed",
+                placeholder="Digite seu NIP", max_chars=12,
+            )
+            st.markdown(
+                '<div style="font-size:0.78rem;font-weight:600;color:#6b7a8d;'
+                'text-transform:uppercase;letter-spacing:0.05em;'
+                'margin-top:0.75rem;margin-bottom:0.4rem;">'
+                'Senha</div>',
+                unsafe_allow_html=True,
+            )
+            senha_input = st.text_input(
+                "Senha", label_visibility="collapsed",
+                placeholder="Digite sua senha", type="password", max_chars=12,
+            )
+
+            if st.session_state.login_erro:
+                st.markdown(
+                    '<div class="login-erro">⚠️ NIP ou senha incorretos. Verifique e tente novamente.</div>',
+                    unsafe_allow_html=True,
+                )
+
+            submitted = st.form_submit_button(
+                "Entrar", use_container_width=True, type="primary"
+            )
+
+            if submitted:
+                if check_login(nip_input, senha_input):
+                    st.session_state.autenticado = True
+                    st.session_state.usuario_nip = nip_input.strip()
+                    st.session_state.login_erro  = False
+                    st.rerun()
+                else:
+                    st.session_state.login_erro = True
+                    st.rerun()
+
+        st.markdown(
+            '<div style="text-align:center;font-size:0.72rem;color:rgba(255,255,255,0.45);'
+            'margin-top:1rem;">Acesso restrito a usuários autorizados</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.stop()  # Interrompe execução — nada abaixo é renderizado sem login
+
+
+# ─────────────────────────────────────────────
 # ESTILOS CUSTOMIZADOS
 # ─────────────────────────────────────────────
 st.markdown("""
@@ -291,14 +421,24 @@ PALETA_ND     = ["#378ADD", "#185FA5", "#1D9E75", "#D85A30",
 # ─────────────────────────────────────────────
 # GRÁFICO — FUNIL DE DESPESA
 # ─────────────────────────────────────────────
+def safe_float(v):
+    """Garante que um valor seja float válido, nunca NaN/None."""
+    try:
+        f = float(v)
+        return f if f == f else 0.0  # NaN check
+    except Exception:
+        return 0.0
+
+
 def grafico_funil(prov, emp, liq, pago):
+    prov, emp, liq, pago = safe_float(prov), safe_float(emp), safe_float(liq), safe_float(pago)
     steps  = ["Provisionado", "Empenhado", "Liquidado", "Pago"]
     values = [prov, emp, liq, pago]
     colors = [COR_PROVISAO, COR_EMPENHADO, COR_LIQUIDADO, COR_PAGO]
     pcts   = [100, num_pct(emp, prov), num_pct(liq, prov), num_pct(pago, prov)]
 
     fig = go.Figure()
-    for i, (s, v, c, p) in enumerate(zip(steps, values, colors, pcts)):
+    for s, v, c, p in zip(steps, values, colors, pcts):
         fig.add_trace(go.Bar(
             name=s, x=[s], y=[v],
             marker_color=c,
@@ -309,10 +449,10 @@ def grafico_funil(prov, emp, liq, pago):
         ))
     fig.update_layout(
         barmode="group", showlegend=False,
-        height=320, margin=dict(t=40, b=10, l=10, r=10),
-        plot_bgcolor="white", paper_bgcolor="white",
-        yaxis=dict(showgrid=True, gridcolor="#f0f0f0", tickformat=",.0f",
-                   title="R$", titlefont=dict(size=11)),
+        height=320, margin=dict(t=50, b=10, l=10, r=10),
+        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+        yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.2)", tickformat=",.0f",
+                   title=dict(text="R$", font=dict(size=11))),
         xaxis=dict(showgrid=False),
     )
     return fig
@@ -338,9 +478,9 @@ def grafico_evolucao(df_mensal):
     fig.update_layout(
         barmode="group", height=340,
         margin=dict(t=20, b=20, l=10, r=10),
-        plot_bgcolor="white", paper_bgcolor="white",
+        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-        yaxis=dict(showgrid=True, gridcolor="#f0f0f0", tickformat=",.0f", title="R$"),
+        yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.2)", tickformat=",.0f", title=dict(text="R$")),
         xaxis=dict(showgrid=False),
         hovermode="x unified",
     )
@@ -368,9 +508,9 @@ def grafico_pi(df_pi):
     fig.update_layout(
         barmode="overlay", height=max(280, len(df_plot) * 42),
         margin=dict(t=20, b=10, l=10, r=10),
-        plot_bgcolor="white", paper_bgcolor="white",
+        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
         legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0),
-        xaxis=dict(showgrid=True, gridcolor="#f0f0f0", tickformat=",.0f", title="R$"),
+        xaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.2)", tickformat=",.0f", title=dict(text="R$")),
         yaxis=dict(showgrid=False),
         hovermode="y unified",
     )
@@ -394,7 +534,7 @@ def grafico_nd_rosca(df_nd, col="Empenhado"):
         height=340, margin=dict(t=20, b=20, l=10, r=10),
         showlegend=True,
         legend=dict(font=dict(size=10), orientation="v", x=1.02),
-        paper_bgcolor="white",
+        paper_bgcolor="rgba(0,0,0,0)",
     )
     return fig
 
@@ -417,9 +557,9 @@ def grafico_rp_nd(df_rp_nd):
         barmode="stack",
         height=max(260, len(df_plot) * 38),
         margin=dict(t=20, b=10, l=10, r=10),
-        plot_bgcolor="white", paper_bgcolor="white",
+        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
         legend=dict(orientation="h", y=1.05),
-        xaxis=dict(showgrid=True, gridcolor="#f0f0f0", tickformat=",.0f", title="R$"),
+        xaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.2)", tickformat=",.0f", title=dict(text="R$")),
         yaxis=dict(showgrid=False),
     )
     return fig
@@ -431,6 +571,15 @@ def grafico_rp_nd(df_rp_nd):
 with st.sidebar:
     st.markdown("### ⚓ Execução Financeira")
     st.markdown("**4º Btl Op Lit FN · 2026**")
+
+    # Usuário logado + botão de logout
+    col_nip, col_sair = st.columns([2, 1])
+    with col_nip:
+        st.caption(f"🔒 NIP {st.session_state.usuario_nip}")
+    with col_sair:
+        if st.button("Sair", use_container_width=True):
+            logout()
+
     st.divider()
 
     st.markdown("#### 📂 Importar planilhas")
@@ -523,7 +672,7 @@ if not df_emp.empty:
 st.markdown("""
 <div class="main-header">
   <h1>⚓ Dashboard de Execução Financeira</h1>
-  <p>4º Batalhão de Operações Ribeirinhas — Exercício 2026</p>
+  <p>4º Batalhão de Operações Litorâneas de Fuzileiros Navais — Exercício 2026</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -543,15 +692,22 @@ if df_emp.empty and df_rp.empty:
 # ─────────────────────────────────────────────
 # CÁLCULOS CONSOLIDADOS
 # ─────────────────────────────────────────────
-total_prov  = df_sg["Provisao"].sum()    if not df_sg.empty else 0
-total_cred  = df_sg["Credito_Disp"].sum() if not df_sg.empty else 0
-total_emp   = df_emp["Empenhado"].sum()  if not df_emp.empty else 0
-total_liq   = df_emp["Liquidado"].sum()  if not df_emp.empty else 0
-total_pago  = df_emp["Pago"].sum()       if not df_emp.empty else 0
+# Usar apenas o último mês do saldo geral (evita somar meses repetidos)
+if not df_sg.empty and "Mes" in df_sg.columns:
+    _ultimo_mes = df_sg["Mes"].iloc[-1]
+    _df_sg_last = df_sg[df_sg["Mes"] == _ultimo_mes]
+else:
+    _df_sg_last = df_sg
 
-rp_ins  = df_rp["RP_Inscrito"].sum()  if not df_rp.empty else 0
-rp_pago = df_rp["RP_Pago"].sum()      if not df_rp.empty else 0
-rp_apr  = df_rp["RP_A_Pagar"].sum()   if not df_rp.empty else 0
+total_prov  = safe_float(_df_sg_last["Provisao"].sum())    if not _df_sg_last.empty else 0
+total_cred  = safe_float(_df_sg_last["Credito_Disp"].sum()) if not _df_sg_last.empty else 0
+total_emp   = safe_float(df_emp["Empenhado"].sum())  if not df_emp.empty else 0
+total_liq   = safe_float(df_emp["Liquidado"].sum())  if not df_emp.empty else 0
+total_pago  = safe_float(df_emp["Pago"].sum())       if not df_emp.empty else 0
+
+rp_ins  = safe_float(df_rp["RP_Inscrito"].sum())  if not df_rp.empty else 0
+rp_pago = safe_float(df_rp["RP_Pago"].sum())      if not df_rp.empty else 0
+rp_apr  = safe_float(df_rp["RP_A_Pagar"].sum())   if not df_rp.empty else 0
 
 tx_emp  = total_emp  / total_prov * 100 if total_prov else 0
 tx_exec = total_pago / total_prov * 100 if total_prov else 0
@@ -1070,8 +1226,8 @@ with tabs[5]:
             ))
             fig_tx.update_layout(
                 height=260, margin=dict(t=20, b=20, l=10, r=10),
-                plot_bgcolor="white", paper_bgcolor="white",
-                yaxis=dict(showgrid=True, gridcolor="#f0f0f0",
+                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.2)",
                            ticksuffix="%", title="% executado"),
                 xaxis=dict(showgrid=False),
             )
